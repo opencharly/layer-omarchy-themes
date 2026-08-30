@@ -41,6 +41,22 @@ omarchy-themes:
                   set -eu
                   export OMARCHY_PATH=/usr/share/omarchy
                   export THEME_HEADLESS=1
+                  # omarchy-theme-set takes an flock in $XDG_RUNTIME_DIR. At BUILD time
+                  # that directory does not exist yet — layer-supervisord creates it at
+                  # deploy — so the lock fails and the script continues unlocked:
+                  #   omarchy-theme-set: line 261: /tmp/xdg-runtime/...lock: No such file
+                  #   flock: 9: Bad file descriptor
+                  # The theme still applies, which is why every check passed while three
+                  # warnings went to the build log on every image that composes this candy.
+                  mkdir -p "${XDG_RUNTIME_DIR:-/tmp/xdg-runtime}"
+                  # gsettings' dconf backend needs a session bus, which a build container
+                  # has none of, so it emits
+                  #   dconf-WARNING: failed to commit changes to dconf: Could not connect
+                  # twice. The memory backend is gsettings' own answer for exactly this:
+                  # the writes go nowhere, which is correct here because the RUNTIME theme
+                  # state this candy asserts is the rendered files under ~/.local/state,
+                  # not dconf keys.
+                  export GSETTINGS_BACKEND=memory
                   omarchy-theme-set "${OMARCHY_THEME}"
                   # Verify HERE, not in a check: ${OMARCHY_THEME} is a candy var, expanded
                   # at build time by the step compiler. A check: step is expanded by the
