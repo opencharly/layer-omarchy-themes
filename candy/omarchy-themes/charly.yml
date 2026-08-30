@@ -1,0 +1,108 @@
+omarchy-themes:
+    candy:
+        version: 2026.242.0000
+        description: |
+            Selects one of Omarchy's bundled themes and renders it into every app config it drives.
+            omarchy-themes installs no packages: all 22 themes ship inside the `omarchy`
+            package at /usr/share/omarchy/themes, and the templates that project a theme
+            into per-app configuration ship beside them at
+            /usr/share/omarchy/default/themed. This candy's whole job is to APPLY one, by
+            running omarchy-theme-set in its headless mode so the selection is baked into
+            the image rather than left to first login. Verifiable on the built image: the
+            recorded theme name matches what was asked for, the current-theme link
+            resolves, and the rendered per-app configs exist.
+        require:
+            # The themes and the omarchy-theme-set command both come from the `omarchy`
+            # package, and the command reads $HOME/.config/omarchy — so both the runtime
+            # and the /etc/skel seeding must already be in place.
+            - '@github.com/opencharly/layer-omarchy-base/candy/omarchy-base:v2026.242.0437'
+        var:
+            # Omarchy's own default. Any of the 22 bundled names works, lowercased and
+            # hyphenated (omarchy-theme-set normalises "Tokyo Night" to "tokyo-night").
+            OMARCHY_THEME: tokyo-night
+        env_accept:
+            - name: OMARCHY_THEME
+              description: "Bundled Omarchy theme to bake in (default: tokyo-night). See `omarchy-theme-list`."
+        plan:
+            - run: bake the selected Omarchy theme into the image
+              id: omarchy-themes-set
+              context:
+                - build
+              run_as: "${USER}"
+              # THEME_HEADLESS=1 is omarchy-theme-set's own headless mode: it skips the
+              # wallpaper/background step, which needs a running compositor and cannot
+              # work in a build container. Everything that IS colour — the terminal,
+              # editor, bar, btop and Hyprland configs rendered from the theme's
+              # colors.toml through /usr/share/omarchy/default/themed/*.tpl — still runs.
+              #
+              # OMARCHY_PATH is exported because the command resolves its theme directory
+              # from it; the packaged location is /usr/share/omarchy.
+              command: |
+                  set -eu
+                  export OMARCHY_PATH=/usr/share/omarchy
+                  export THEME_HEADLESS=1
+                  omarchy-theme-set "${OMARCHY_THEME}"
+                  # Verify HERE, not in a check: ${OMARCHY_THEME} is a candy var, expanded
+                  # at build time by the step compiler. A check: step is expanded by the
+                  # check runner instead, which has no candy vars — referencing it there
+                  # makes the check SKIP with "unresolved variables", i.e. silently stop
+                  # asserting anything. Measured: an earlier revision did exactly that.
+                  want=$(printf '%s' "${OMARCHY_THEME}" | tr 'A-Z ' 'a-z-')
+                  got=$(cat "$HOME/.local/state/omarchy/current/theme.name")
+                  [ "$got" = "$want" ] || {
+                    echo "omarchy-theme-set recorded '$got' but '$want' was requested" >&2
+                    exit 1; }
+
+            - check: the applied theme content is the bundled theme that was recorded
+              id: omarchy-themes-recorded
+              context:
+                - build
+              # v4.0.1 records the applied theme under ~/.local/state (not ~/.config).
+              #
+              # This asserts COHERENCE — that the name recorded in theme.name is the same
+              # theme the `current/theme` link actually points at — rather than comparing
+              # against ${OMARCHY_THEME}. The var is a candy var: the step compiler expands
+              # it, the CHECK RUNNER does not, so naming it here makes the check SKIP with
+              # "unresolved variables" and assert nothing at all. That regression was
+              # measured, so the request-vs-recorded comparison lives in the run: step
+              # above where the var is real, and this check covers what remains: that the
+              # two pieces of recorded state cannot disagree.
+              #
+              # `current/theme` is a real DIRECTORY that omarchy-theme-set copies the
+              # bundled theme into — NOT a symlink to /usr/share/omarchy/themes/<name>, as
+              # an earlier revision of this check assumed and the bed caught. So the
+              # coherence assertion is a CONTENT comparison: the applied colors.toml must
+              # be byte-identical to the bundled theme that theme.name names. Verified to
+              # discriminate — the same comparison against a different bundled theme
+              # differs, so this cannot pass for the wrong theme.
+              exit_status: 0
+              command: |
+                  set -eu
+                  state="$HOME/.local/state/omarchy/current"
+                  name=$(cat "$state/theme.name")
+                  [ -n "$name" ] || { echo "theme.name is empty" >&2; exit 1; }
+                  cmp -s "$state/theme/colors.toml" "/usr/share/omarchy/themes/$name/colors.toml" || {
+                    echo "applied theme content does not match bundled theme '$name'" >&2
+                    exit 1; }
+
+            - check: the current-theme directory resolves to real theme content
+              id: omarchy-themes-current-resolves
+              context:
+                - build
+              exit_status: 0
+              command: test -e "${HOME}/.local/state/omarchy/current/theme/colors.toml"
+
+            - check: the full bundled theme set is available to switch to at runtime
+              id: omarchy-themes-available
+              context:
+                - build
+              exit_status: 0
+              command: sh -c 'test "$(ls -1 /usr/share/omarchy/themes | wc -l)" -ge 22'
+
+            - check: the theme-set command is on PATH for runtime switching
+              id: omarchy-themes-cli
+              context:
+                - build
+              file:
+                file: /usr/bin/omarchy-theme-set
+                exists: true

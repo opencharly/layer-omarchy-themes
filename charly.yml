@@ -1,0 +1,13 @@
+#  opencharly/layer-omarchy-themes — Omarchy's bundled themes, applied.
+#
+#  No packages: all 22 themes ship inside the `omarchy` package, and so do the templates
+#  that render one into per-app configuration. This layer's job is to APPLY one at build
+#  time so the selection is baked into the image.
+#
+#  SHAPE: one repo, one external pin, members under candy/<name>/. A candy's identity IS
+#  its directory, so members are never inlined into a single charly.yml.
+version: 2026.240.1943
+repo: github.com/opencharly/layer-omarchy-themes
+discover:
+    - path: candy
+      recursive: true
