@@ -6,7 +6,6 @@
 #
 #  SHAPE: one repo, one external pin, members under candy/<name>/. A candy's identity IS
 #  its directory, so members are never inlined into a single charly.yml.
-version: 2026.240.1943
 repo: github.com/opencharly/layer-omarchy-themes
 discover:
     - path: candy
