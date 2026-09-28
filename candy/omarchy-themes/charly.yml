@@ -1,6 +1,5 @@
 omarchy-themes:
     candy:
-        version: 2026.242.0000
         description: |
             Selects one of Omarchy's bundled themes and renders it into every app config it drives.
             omarchy-themes installs no packages: all 22 themes ship inside the `omarchy`
