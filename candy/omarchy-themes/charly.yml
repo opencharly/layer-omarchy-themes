@@ -1,6 +1,5 @@
 omarchy-themes:
     candy:
-        version: 2026.242.0000
         description: |
             Selects one of Omarchy's bundled themes and renders it into every app config it drives.
             omarchy-themes installs no packages: all 22 themes ship inside the `omarchy`
@@ -15,7 +14,7 @@ omarchy-themes:
             # The themes and the omarchy-theme-set command both come from the `omarchy`
             # package, and the command reads $HOME/.config/omarchy — so both the runtime
             # and the /etc/skel seeding must already be in place.
-            - '@github.com/opencharly/layer-omarchy-base/candy/omarchy-base:v2026.242.0437'
+            - '@github.com/opencharly/layer-omarchy-base/candy/omarchy-base:v2026.242.0701'
         var:
             # Omarchy's own default. Any of the 22 bundled names works, lowercased and
             # hyphenated (omarchy-theme-set normalises "Tokyo Night" to "tokyo-night").
@@ -38,37 +37,36 @@ omarchy-themes:
               # OMARCHY_PATH is exported because the command resolves its theme directory
               # from it; the packaged location is /usr/share/omarchy.
               command: |
-                  set -eu
-                  export OMARCHY_PATH=/usr/share/omarchy
-                  export THEME_HEADLESS=1
-                  # omarchy-theme-set takes an flock in $XDG_RUNTIME_DIR. At BUILD time
-                  # that directory does not exist yet — layer-supervisord creates it at
-                  # deploy — so the lock fails and the script continues unlocked:
-                  #   omarchy-theme-set: line 261: /tmp/xdg-runtime/...lock: No such file
-                  #   flock: 9: Bad file descriptor
-                  # The theme still applies, which is why every check passed while three
-                  # warnings went to the build log on every image that composes this candy.
-                  mkdir -p "${XDG_RUNTIME_DIR:-/tmp/xdg-runtime}"
-                  # gsettings' dconf backend needs a session bus, which a build container
-                  # has none of, so it emits
-                  #   dconf-WARNING: failed to commit changes to dconf: Could not connect
-                  # twice. The memory backend is gsettings' own answer for exactly this:
-                  # the writes go nowhere, which is correct here because the RUNTIME theme
-                  # state this candy asserts is the rendered files under ~/.local/state,
-                  # not dconf keys.
-                  export GSETTINGS_BACKEND=memory
-                  omarchy-theme-set "${OMARCHY_THEME}"
-                  # Verify HERE, not in a check: ${OMARCHY_THEME} is a candy var, expanded
-                  # at build time by the step compiler. A check: step is expanded by the
-                  # check runner instead, which has no candy vars — referencing it there
-                  # makes the check SKIP with "unresolved variables", i.e. silently stop
-                  # asserting anything. Measured: an earlier revision did exactly that.
-                  want=$(printf '%s' "${OMARCHY_THEME}" | tr 'A-Z ' 'a-z-')
-                  got=$(cat "$HOME/.local/state/omarchy/current/theme.name")
-                  [ "$got" = "$want" ] || {
-                    echo "omarchy-theme-set recorded '$got' but '$want' was requested" >&2
-                    exit 1; }
-
+                set -eu
+                export OMARCHY_PATH=/usr/share/omarchy
+                export THEME_HEADLESS=1
+                # omarchy-theme-set takes an flock in $XDG_RUNTIME_DIR. At BUILD time
+                # that directory does not exist yet — layer-supervisord creates it at
+                # deploy — so the lock fails and the script continues unlocked:
+                #   omarchy-theme-set: line 261: /tmp/xdg-runtime/...lock: No such file
+                #   flock: 9: Bad file descriptor
+                # The theme still applies, which is why every check passed while three
+                # warnings went to the build log on every image that composes this candy.
+                mkdir -p "${XDG_RUNTIME_DIR:-/tmp/xdg-runtime}"
+                # gsettings' dconf backend needs a session bus, which a build container
+                # has none of, so it emits
+                #   dconf-WARNING: failed to commit changes to dconf: Could not connect
+                # twice. The memory backend is gsettings' own answer for exactly this:
+                # the writes go nowhere, which is correct here because the RUNTIME theme
+                # state this candy asserts is the rendered files under ~/.local/state,
+                # not dconf keys.
+                export GSETTINGS_BACKEND=memory
+                omarchy-theme-set "${OMARCHY_THEME}"
+                # Verify HERE, not in a check: ${OMARCHY_THEME} is a candy var, expanded
+                # at build time by the step compiler. A check: step is expanded by the
+                # check runner instead, which has no candy vars — referencing it there
+                # makes the check SKIP with "unresolved variables", i.e. silently stop
+                # asserting anything. Measured: an earlier revision did exactly that.
+                want=$(printf '%s' "${OMARCHY_THEME}" | tr 'A-Z ' 'a-z-')
+                got=$(cat "$HOME/.local/state/omarchy/current/theme.name")
+                [ "$got" = "$want" ] || {
+                  echo "omarchy-theme-set recorded '$got' but '$want' was requested" >&2
+                  exit 1; }
             - check: the applied theme content is the bundled theme that was recorded
               id: omarchy-themes-recorded
               context:
@@ -93,28 +91,25 @@ omarchy-themes:
               # differs, so this cannot pass for the wrong theme.
               exit_status: 0
               command: |
-                  set -eu
-                  state="$HOME/.local/state/omarchy/current"
-                  name=$(cat "$state/theme.name")
-                  [ -n "$name" ] || { echo "theme.name is empty" >&2; exit 1; }
-                  cmp -s "$state/theme/colors.toml" "/usr/share/omarchy/themes/$name/colors.toml" || {
-                    echo "applied theme content does not match bundled theme '$name'" >&2
-                    exit 1; }
-
+                set -eu
+                state="$HOME/.local/state/omarchy/current"
+                name=$(cat "$state/theme.name")
+                [ -n "$name" ] || { echo "theme.name is empty" >&2; exit 1; }
+                cmp -s "$state/theme/colors.toml" "/usr/share/omarchy/themes/$name/colors.toml" || {
+                  echo "applied theme content does not match bundled theme '$name'" >&2
+                  exit 1; }
             - check: the current-theme directory resolves to real theme content
               id: omarchy-themes-current-resolves
               context:
                 - build
               exit_status: 0
               command: test -e "${HOME}/.local/state/omarchy/current/theme/colors.toml"
-
             - check: the full bundled theme set is available to switch to at runtime
               id: omarchy-themes-available
               context:
                 - build
               exit_status: 0
               command: sh -c 'test "$(ls -1 /usr/share/omarchy/themes | wc -l)" -ge 22'
-
             - check: the theme-set command is on PATH for runtime switching
               id: omarchy-themes-cli
               context:
