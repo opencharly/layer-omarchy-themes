@@ -14,7 +14,7 @@ omarchy-themes:
             # The themes and the omarchy-theme-set command both come from the `omarchy`
             # package, and the command reads $HOME/.config/omarchy — so both the runtime
             # and the /etc/skel seeding must already be in place.
-            - '@github.com/opencharly/layer-omarchy-base/candy/omarchy-base:v2026.242.0437'
+            - '@github.com/opencharly/layer-omarchy-base/candy/omarchy-base:v2026.272.0437'
         var:
             # Omarchy's own default. Any of the 22 bundled names works, lowercased and
             # hyphenated (omarchy-theme-set normalises "Tokyo Night" to "tokyo-night").
